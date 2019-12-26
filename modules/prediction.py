@@ -31,16 +31,20 @@ class Attention(nn.Module):
         num_steps = batch_max_length + 1  # +1 for [s] at end of sentence.
 
         output_hiddens = torch.FloatTensor(batch_size, num_steps, self.hidden_size).fill_(0).to(device)
-        hidden = (torch.FloatTensor(batch_size, self.hidden_size).fill_(0).to(device),
+        hidden_1 = (torch.FloatTensor(batch_size, self.hidden_size).fill_(0).to(device),
                   torch.FloatTensor(batch_size, self.hidden_size).fill_(0).to(device))
+        hidden_2 = (torch.FloatTensor(batch_size, self.hidden_size).fill_(0).to(device),
+                  torch.FloatTensor(batch_size, self.hidden_size).fill_(0).to(device))
+                  # i add a LSTM, total 2 LTSM to decode embedding
 
         if is_train:
             for i in range(num_steps):
                 # one-hot vectors for a i-th char. in a batch
                 char_onehots = self._char_to_onehot(text[:, i], onehot_dim=self.num_classes)
                 # hidden : decoder's hidden s_{t-1}, batch_H : encoder's hidden H, char_onehots : one-hot(y_{t-1})
-                hidden, alpha = self.attention_cell(hidden, batch_H, char_onehots)
-                output_hiddens[:, i, :] = hidden[0]  # LSTM hidden index (0: hidden, 1: Cell)
+                hidden_1, hidden_2, alpha = self.attention_cell(hidden_1, hidden_2, batch_H, char_onehots)
+                output_hiddens[:, i, :] = hidden_2[0]  # LSTM hidden index (0: hidden, 1: Cell)
+                # hidden_2 is the final output of Attention
             probs = self.generator(output_hiddens)
 
         else:
@@ -49,8 +53,8 @@ class Attention(nn.Module):
 
             for i in range(num_steps):
                 char_onehots = self._char_to_onehot(targets, onehot_dim=self.num_classes)
-                hidden, alpha = self.attention_cell(hidden, batch_H, char_onehots)
-                probs_step = self.generator(hidden[0])
+                hidden_1, hidden_2, alpha = self.attention_cell(hidden_1, hidden_2, batch_H, char_onehots)
+                probs_step = self.generator(hidden_2[0])
                 probs[:, i, :] = probs_step
                 _, next_input = probs_step.max(1)
                 targets = next_input
@@ -65,17 +69,21 @@ class AttentionCell(nn.Module):
         self.i2h = nn.Linear(input_size, hidden_size, bias=False)
         self.h2h = nn.Linear(hidden_size, hidden_size)  # either i2i or h2h should have bias
         self.score = nn.Linear(hidden_size, 1, bias=False)
-        self.rnn = nn.LSTMCell(input_size + num_embeddings, hidden_size)
+        self.rnn1 = nn.LSTMCell(input_size + num_embeddings, hidden_size)
+        self.hlinear = nn.Linear(hidden_size, hidden_size)
+        self.rnn2 = nn.LSTMCell(hidden_size, hidden_size)
         self.hidden_size = hidden_size
 
-    def forward(self, prev_hidden, batch_H, char_onehots):
+    def forward(self, prev_hidden_1, prev_hidden_2, batch_H, char_onehots):
         # [batch_size x num_encoder_step x num_channel] -> [batch_size x num_encoder_step x hidden_size]
         batch_H_proj = self.i2h(batch_H)
-        prev_hidden_proj = self.h2h(prev_hidden[0]).unsqueeze(1)
+        prev_hidden_proj = self.h2h(prev_hidden_2[0]).unsqueeze(1)
         e = self.score(torch.tanh(batch_H_proj + prev_hidden_proj))  # batch_size x num_encoder_step * 1
 
         alpha = F.softmax(e, dim=1)
         context = torch.bmm(alpha.permute(0, 2, 1), batch_H).squeeze(1)  # batch_size x num_channel
         concat_context = torch.cat([context, char_onehots], 1)  # batch_size x (num_channel + num_embedding)
-        cur_hidden = self.rnn(concat_context, prev_hidden)
-        return cur_hidden, alpha
+        cur_hidden_1 = self.rnn1(concat_context, prev_hidden_1)
+        cur_hidden = self.hlinear(cur_hidden_1[0]) # LSTM hidden index (0: hidden, 1: Cell)
+        cur_hidden_2 = self.rnn2(cur_hidden, prev_hidden_2)
+        return cur_hidden_1, cur_hidden_2, alpha
