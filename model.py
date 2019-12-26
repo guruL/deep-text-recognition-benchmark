@@ -30,6 +30,7 @@ class Model(nn.Module):
         self.opt = opt
         self.stages = {'Trans': opt.Transformation, 'Feat': opt.FeatureExtraction,
                        'Seq': opt.SequenceModeling, 'Pred': opt.Prediction}
+        self.baseline = opt.baseline
 
         """ Transformation """
         if opt.Transformation == 'TPS':
@@ -78,7 +79,7 @@ class Model(nn.Module):
 
         """ Feature extraction stage """
         visual_feature = self.FeatureExtraction(input)
-        if opt.baseline == True: # only baseline model train with 1d vector
+        if self.baseline == True: # only baseline model train with 1d vector
             visual_feature = self.AdaptiveAvgPool(visual_feature.permute(0, 3, 1, 2))  # [b, c, h, w] -> [b, w, c, h]
         visual_feature = visual_feature.squeeze(3)
 
