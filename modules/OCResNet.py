@@ -44,10 +44,10 @@ class OCResNet(nn.Module):
         self.output_channel_block = [int(output_channel / 4), int(output_channel / 2), output_channel, output_channel]
         # 128 256 512 512
         self.inplanes = int(output_channel / 8) # 64
-        self.conv0_1 = nn.Conv2d(input_channel, int(output_channel / 16),
+        self.conv0_1 = nn.Conv2d(input_channel, self.inplanes, 
                                  kernel_size=3, stride=1, padding=1, bias=False)
-        self.bn0_1 = nn.BatchNorm2d(int(output_channel / 16))
-        self.conv0_2 = nn.Conv2d(int(output_channel / 16), self.inplanes,
+        self.bn0_1 = nn.BatchNorm2d(self.inplanes)
+        self.conv0_2 = nn.Conv2d(self.inplanes, self.inplanes,
                                  kernel_size=3, stride=1, padding=1, bias=False)
         self.bn0_2 = nn.BatchNorm2d(self.inplanes)
         self.relu = nn.ReLU(inplace=True)
