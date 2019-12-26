@@ -20,6 +20,7 @@ from modules.transformation import TPS_SpatialTransformerNetwork
 from modules.feature_extraction import VGG_FeatureExtractor, RCNN_FeatureExtractor, ResNet_FeatureExtractor
 from modules.sequence_modeling import BidirectionalLSTM
 from modules.prediction import Attention
+from modules.OCResNet import OCResNet_FeatureExtractor
 
 
 class Model(nn.Module):
@@ -44,9 +45,12 @@ class Model(nn.Module):
             self.FeatureExtraction = RCNN_FeatureExtractor(opt.input_channel, opt.output_channel)
         elif opt.FeatureExtraction == 'ResNet':
             self.FeatureExtraction = ResNet_FeatureExtractor(opt.input_channel, opt.output_channel)
+        elif opt.FeatureExtraction == 'OCResNet':
+            self.FeatureExtraction = OCResNet_FeatureExtractor(opt.input_channel, opt.output_channel)
         else:
             raise Exception('No FeatureExtraction module specified')
         self.FeatureExtraction_output = opt.output_channel  # int(imgH/16-1) * 512
+        
         self.AdaptiveAvgPool = nn.AdaptiveAvgPool2d((None, 1))  # Transform final (imgH/16-1) -> 1
 
         """ Sequence modeling"""
@@ -74,7 +78,8 @@ class Model(nn.Module):
 
         """ Feature extraction stage """
         visual_feature = self.FeatureExtraction(input)
-        visual_feature = self.AdaptiveAvgPool(visual_feature.permute(0, 3, 1, 2))  # [b, c, h, w] -> [b, w, c, h]
+        if opt.baseline == True: # only baseline model train with 1d vector
+            visual_feature = self.AdaptiveAvgPool(visual_feature.permute(0, 3, 1, 2))  # [b, c, h, w] -> [b, w, c, h]
         visual_feature = visual_feature.squeeze(3)
 
         """ Sequence modeling stage """
@@ -90,3 +95,24 @@ class Model(nn.Module):
             prediction = self.Prediction(contextual_feature.contiguous(), text, is_train, batch_max_length=self.opt.batch_max_length)
 
         return prediction
+
+
+if __name__ == "__main__":
+    import argparse
+    import torch
+    opt = argparse.ArgumentParser()
+    opt.Transformation = "None"
+    opt.FeatureExtraction = "OCResNet"
+    opt.SequenceModeling = "BiLSTM"
+    opt.Prediction = "CTC"
+    opt.input_channel = 3
+    opt.output_channel = 512
+    opt.hidden_size = 256
+    opt.num_class = 37
+    opt.batch_max_length = 2
+    opt.baseline = True
+    net = Model(opt)
+
+    x = torch.zeros(10, 3, 32, 100)
+    y = net(x, 2)
+    print(y.shape)
