@@ -78,23 +78,26 @@ class Model(nn.Module):
             input = self.Transformation(input)
 
         """ Feature extraction stage """
-        visual_feature = self.FeatureExtraction(input)
+        # diff: 2D Attention 先试用论文垂直降采样的方法
+        feature_map = self.FeatureExtraction(input)
         if self.baseline == True: # only baseline model train with 1d vector
-            visual_feature = self.AdaptiveAvgPool(visual_feature.permute(0, 3, 1, 2))  # [b, c, h, w] -> [b, w, c, h]
+            visual_feature = self.AdaptiveAvgPool(feature_map.permute(0, 3, 1, 2))  # [b, c, h, w] -> [b, w, c, h]
         visual_feature = visual_feature.squeeze(3)
-
+        
         """ Sequence modeling stage """
         if self.stages['Seq'] == 'BiLSTM':
+            # diff: 2D Attention 先试用两层 Bi-LSTM 进行编码
             contextual_feature = self.SequenceModeling(visual_feature)
         else:
             contextual_feature = visual_feature  # for convenience. this is NOT contextually modeled by BiLSTM
-
+       
         """ Prediction stage """
         if self.stages['Pred'] == 'CTC':
             prediction = self.Prediction(contextual_feature.contiguous())
         else:
-            prediction = self.Prediction(contextual_feature.contiguous(), text, is_train, batch_max_length=self.opt.batch_max_length)
-
+            # diff: 2D Attention 除了LSTM进行编码的特征之外，还要引入 feature map
+            prediction = self.Prediction(feature_map.contiguous(), contextual_feature.contiguous(), text, is_train, batch_max_length=self.opt.batch_max_length)
+            
         return prediction
 
 
@@ -105,7 +108,7 @@ if __name__ == "__main__":
     opt.Transformation = "None"
     opt.FeatureExtraction = "OCResNet"
     opt.SequenceModeling = "BiLSTM"
-    opt.Prediction = "CTC"
+    opt.Prediction = "Attn"
     opt.input_channel = 3
     opt.output_channel = 512
     opt.hidden_size = 256
@@ -115,5 +118,6 @@ if __name__ == "__main__":
     net = Model(opt)
 
     x = torch.zeros(10, 3, 32, 100)
-    y = net(x, 2)
+    text = torch.zeros(10, 38).long()
+    y = net(x, text)
     print(y.shape)
