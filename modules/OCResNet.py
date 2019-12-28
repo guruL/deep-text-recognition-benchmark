@@ -70,10 +70,11 @@ class OCResNet(nn.Module):
                                2], kernel_size=3, stride=1, padding=1, bias=False)
         self.bn3 = nn.BatchNorm2d(self.output_channel_block[2])
 
+        self.maxpool4 = nn.MaxPool2d(kernel_size=(2, 1), stride=(2, 1))
         self.layer4 = self._make_layer(block, self.output_channel_block[3], layers[3], stride=1)
-        self.conv4_1 = nn.Conv2d(self.output_channel_block[3], self.output_channel_block[
+        self.conv4 = nn.Conv2d(self.output_channel_block[3], self.output_channel_block[
                                  3], kernel_size=3, stride=1, padding=1, bias=False)
-        self.bn4_1 = nn.BatchNorm2d(self.output_channel_block[3])
+        self.bn4 = nn.BatchNorm2d(self.output_channel_block[3])
         # self.conv4_2 = nn.Conv2d(self.output_channel_block[3], self.output_channel_block[
         #                          3], kernel_size=2, stride=1, padding=0, bias=False)
         # self.bn4_2 = nn.BatchNorm2d(self.output_channel_block[3])
@@ -121,9 +122,10 @@ class OCResNet(nn.Module):
         x = self.bn3(x)
         x = self.relu(x)
 
+        x = self.maxpool4(x)
         x = self.layer4(x)
-        x = self.conv4_1(x)
-        x = self.bn4_1(x)
+        x = self.conv4(x)
+        x = self.bn4(x)
         x = self.relu(x)
 
         return x
