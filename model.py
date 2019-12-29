@@ -56,9 +56,11 @@ class Model(nn.Module):
 
         """ Sequence modeling"""
         if opt.SequenceModeling == 'BiLSTM':
-            self.SequenceModeling = nn.Sequential(
-                BidirectionalLSTM(self.FeatureExtraction_output, opt.hidden_size, opt.hidden_size),
-                BidirectionalLSTM(opt.hidden_size, opt.hidden_size, opt.hidden_size))
+            # self.SequenceModeling = nn.Sequential(
+            #     BidirectionalLSTM(self.FeatureExtraction_output, opt.hidden_size, opt.hidden_size),
+            #     BidirectionalLSTM(opt.hidden_size, opt.hidden_size, opt.hidden_size))
+            self.BiLSTM1 = BidirectionalLSTM(self.FeatureExtraction_output, opt.hidden_size, opt.hidden_size)
+            self.BiLSTM2 = BidirectionalLSTM(opt.hidden_size, opt.hidden_size, opt.hidden_size)
             self.SequenceModeling_output = opt.hidden_size
         else:
             print('No SequenceModeling module specified')
@@ -87,7 +89,8 @@ class Model(nn.Module):
         """ Sequence modeling stage """
         if self.stages['Seq'] == 'BiLSTM':
             # diff: 2D Attention 先试用两层 Bi-LSTM 进行编码
-            contextual_feature = self.SequenceModeling(visual_feature)
+            contextual_feature, hidden = self.BiLSTM1(visual_feature)
+            contextual_feature, hidden = self.BiLSTM2(contextual_feature)
         else:
             contextual_feature = visual_feature  # for convenience. this is NOT contextually modeled by BiLSTM
        
@@ -96,7 +99,7 @@ class Model(nn.Module):
             prediction = self.Prediction(contextual_feature.contiguous())
         else:
             # diff: 2D Attention 除了LSTM进行编码的特征之外，还要引入 feature map
-            prediction = self.Prediction(feature_map.contiguous(), contextual_feature.contiguous(), text, is_train, batch_max_length=self.opt.batch_max_length)
+            prediction = self.Prediction(feature_map.contiguous(), contextual_feature.contiguous(), hidden, text, is_train, batch_max_length=self.opt.batch_max_length)
             
         return prediction
 
@@ -113,7 +116,7 @@ if __name__ == "__main__":
     opt.output_channel = 512
     opt.hidden_size = 256
     opt.num_class = 37
-    opt.batch_max_length = 2
+    opt.batch_max_length = 25
     opt.baseline = True
     net = Model(opt)
 

@@ -20,7 +20,7 @@ class Attention(nn.Module):
         one_hot = one_hot.scatter_(1, input_char, 1)
         return one_hot
 
-    def forward(self, feature_map, batch_H, text, is_train=True, batch_max_length=25):
+    def forward(self, feature_map, batch_H, hidden, text, is_train=True, batch_max_length=25):
         """
         input:
             feature_map : the last output of feature extractor. size [batch_size, channel, H, W]
@@ -29,7 +29,7 @@ class Attention(nn.Module):
         output: probability distribution at each step [batch_size x num_steps x num_classes]
         """
         batch_size = batch_H.size(0)
-        num_steps = batch_max_length + 1  # +1 for [s] at end of sentence.
+        num_steps = batch_max_length #+ 1 #for [s] at end of sentence. 
 
         output_hiddens = torch.FloatTensor(batch_size, num_steps, self.hidden_size).fill_(0).to(device)
         hidden_1 = (torch.FloatTensor(batch_size, self.hidden_size).fill_(0).to(device),
@@ -38,12 +38,21 @@ class Attention(nn.Module):
                   torch.FloatTensor(batch_size, self.hidden_size).fill_(0).to(device))
                   # i add a LSTM, total 2 LTSM to decode embedding
 
+        # 第一次提出来
+        # 关键是，第一个 char_onehots
+        # 这个地方怎么写更好，我也不知道。。。感觉好多可以考虑的方法
+        char_onehots = self._char_to_onehot(text[:, 0], onehot_dim=self.num_classes)
+        hidden_1 = (hidden[0][0] + hidden[0][1], hidden[1][0] + hidden[1][1])
+        hidden_2 = (hidden[0][0] + hidden[0][1], hidden[1][0] + hidden[1][1])
+        hidden_b = torch.FloatTensor(batch_size, self.hidden_size).fill_(0).to(device)
+        hidden_1, hidden_2, alpha = self.attention_cell(feature_map, hidden_1, hidden_2, hidden_b, char_onehots)
+        
         if is_train:
             for i in range(num_steps):
                 # one-hot vectors for a i-th char. in a batch
                 char_onehots = self._char_to_onehot(text[:, i], onehot_dim=self.num_classes)
                 # hidden : decoder's hidden s_{t-1}, batch_H : encoder's hidden H, char_onehots : one-hot(y_{t-1})
-                hidden_1, hidden_2, alpha = self.attention_cell(feature_map, hidden_1, hidden_2, batch_H, char_onehots)
+                hidden_1, hidden_2, alpha = self.attention_cell(feature_map, hidden_1, hidden_2, batch_H[:, i, :], char_onehots)
                 output_hiddens[:, i, :] = hidden_2[0]  # LSTM hidden index (0: hidden, 1: Cell)
                 # hidden_2 is the final output of Attention
             probs = self.generator(output_hiddens)
@@ -54,7 +63,7 @@ class Attention(nn.Module):
 
             for i in range(num_steps):
                 char_onehots = self._char_to_onehot(targets, onehot_dim=self.num_classes)
-                hidden_1, hidden_2, alpha = self.attention_cell(feature_map, hidden_1, hidden_2, batch_H, char_onehots)
+                hidden_1, hidden_2, alpha = self.attention_cell(feature_map, hidden_1, hidden_2, batch_H[:, i, :], char_onehots)
                 probs_step = self.generator(hidden_2[0])
                 probs[:, i, :] = probs_step
                 _, next_input = probs_step.max(1)
@@ -88,21 +97,19 @@ class AttentionCell(nn.Module):
         # we assume that the channel of feature are known, named self.feature_map_channel
         feature_batch_size, _, feature_map_H, feature_map_W = feature_map.size()
         feature_map_h = self.conv_m2h(feature_map)
-
         # [batch_size x num_encoder_step x num_channel] -> [batch_size x num_encoder_step x hidden_size]
-        batch_H_proj = self.i2h(batch_H) # batch_H shape [batch_size x num_encoder_step x hidden_size]
-        # 这里还应该先改变特征 size he tipe
+        #batch_H_proj = self.i2h(batch_H) # batch_H shape [batch_size x num_encoder_step x hidden_size]
+        batch_H = batch_H.repeat(feature_map_H, feature_map_W, 1, 1).permute(2, 3, 0, 1) # batch_size x channel x H x W
+ 
         batch_H_proj = self.conv_h2h(batch_H)
 
         # prev_hidden  : (h, c)
-        prev_hidden_proj = self.h2h(prev_hidden_2[0]).unsqueeze(1) # prev_hidden_2[0] shape [batch_size x hidden_size]
-        
+        prev_hidden_proj = self.h2h(prev_hidden_2[0]).unsqueeze(2).unsqueeze(2) # prev_hidden_2[0] shape [batch_size x hidden_size]
         # e = self.score(torch.tanh(batch_H_proj + prev_hidden_proj))  # batch_size x num_encoder_step * 1
-        e = self.score(torch.tanh(feature_map_h, batch_H_proj + prev_hidden_proj))
-
+        e = self.score(torch.tanh(feature_map_h + batch_H_proj + prev_hidden_proj))
         alpha = F.softmax(e, dim=1)
-        # 还要改context获取，主要是 size 对不对
-        context = torch.bmm(alpha.permute(0, 2, 1), batch_H).squeeze(1)  # batch_size x num_channel
+
+        context = torch.sum(torch.sum(torch.mul(alpha, feature_map_h), 3), 2)#.squeeze(1)  # batch_size x num_channel
         concat_context = torch.cat([context, char_onehots], 1)  # batch_size x (num_channel + num_embedding)
         cur_hidden_1 = self.rnn1(concat_context, prev_hidden_1)
         cur_hidden = self.hlinear(cur_hidden_1[0]) # LSTM hidden index (0: hidden, 1: Cell)
