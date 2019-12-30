@@ -51,7 +51,7 @@ class Attention(nn.Module):
         if is_train:
             for i in range(num_steps):
                 # one-hot vectors for a i-th char. in a batch
-                char_onehots = self._char_to_onehot(text[:, i], onehot_dim=self.num_classes)
+                char_onehots = self._char_to_onehot(text[:, i+1], onehot_dim=self.num_classes)
                 # hidden : decoder's hidden s_{t-1}, batch_H : encoder's hidden H, char_onehots : one-hot(y_{t-1})
                 hidden_1, hidden_2, alpha = self.attention_cell(feature_map, hidden_1, hidden_2, batch_H[:, i, :], char_onehots)
                 output_hiddens[:, i+1, :] = hidden_2[0]  # LSTM hidden index (0: hidden, 1: Cell)
