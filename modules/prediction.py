@@ -59,8 +59,12 @@ class Attention(nn.Module):
             probs = self.generator(output_hiddens)
 
         else:
+            probs_step = self.generator(hidden_2[0])
             targets = torch.LongTensor(batch_size).fill_(0).to(device)  # [GO] token
             probs = torch.FloatTensor(batch_size, num_steps+1, self.num_classes).fill_(0).to(device)
+            probs[:, 0, :] = probs_step
+            _, next_input = probs_step.max(1)
+            targets = next_input
 
             for i in range(num_steps):
                 char_onehots = self._char_to_onehot(targets, onehot_dim=self.num_classes)
