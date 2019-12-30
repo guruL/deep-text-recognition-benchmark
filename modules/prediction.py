@@ -60,7 +60,7 @@ class Attention(nn.Module):
 
         else:
             targets = torch.LongTensor(batch_size).fill_(0).to(device)  # [GO] token
-            probs = torch.FloatTensor(batch_size, num_steps, self.num_classes).fill_(0).to(device)
+            probs = torch.FloatTensor(batch_size, num_steps+1, self.num_classes).fill_(0).to(device)
 
             for i in range(num_steps):
                 char_onehots = self._char_to_onehot(targets, onehot_dim=self.num_classes)
