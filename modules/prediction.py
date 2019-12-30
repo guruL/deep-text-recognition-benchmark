@@ -31,7 +31,7 @@ class Attention(nn.Module):
         batch_size = batch_H.size(0)
         num_steps = batch_max_length #+ 1 #for [s] at end of sentence. 
 
-        output_hiddens = torch.FloatTensor(batch_size, num_steps, self.hidden_size).fill_(0).to(device)
+        output_hiddens = torch.FloatTensor(batch_size, num_steps+1, self.hidden_size).fill_(0).to(device)
         hidden_1 = (torch.FloatTensor(batch_size, self.hidden_size).fill_(0).to(device),
                   torch.FloatTensor(batch_size, self.hidden_size).fill_(0).to(device))
         hidden_2 = (torch.FloatTensor(batch_size, self.hidden_size).fill_(0).to(device),
@@ -46,14 +46,15 @@ class Attention(nn.Module):
         hidden_2 = (hidden[0][0] + hidden[0][1], hidden[1][0] + hidden[1][1])
         hidden_b = torch.FloatTensor(batch_size, self.hidden_size).fill_(0).to(device)
         hidden_1, hidden_2, alpha = self.attention_cell(feature_map, hidden_1, hidden_2, hidden_b, char_onehots)
-        
+        output_hiddens[:, 0, :] = hidden_2[0]
+
         if is_train:
             for i in range(num_steps):
                 # one-hot vectors for a i-th char. in a batch
                 char_onehots = self._char_to_onehot(text[:, i], onehot_dim=self.num_classes)
                 # hidden : decoder's hidden s_{t-1}, batch_H : encoder's hidden H, char_onehots : one-hot(y_{t-1})
                 hidden_1, hidden_2, alpha = self.attention_cell(feature_map, hidden_1, hidden_2, batch_H[:, i, :], char_onehots)
-                output_hiddens[:, i, :] = hidden_2[0]  # LSTM hidden index (0: hidden, 1: Cell)
+                output_hiddens[:, i+1, :] = hidden_2[0]  # LSTM hidden index (0: hidden, 1: Cell)
                 # hidden_2 is the final output of Attention
             probs = self.generator(output_hiddens)
 
@@ -65,7 +66,7 @@ class Attention(nn.Module):
                 char_onehots = self._char_to_onehot(targets, onehot_dim=self.num_classes)
                 hidden_1, hidden_2, alpha = self.attention_cell(feature_map, hidden_1, hidden_2, batch_H[:, i, :], char_onehots)
                 probs_step = self.generator(hidden_2[0])
-                probs[:, i, :] = probs_step
+                probs[:, i+1, :] = probs_step
                 _, next_input = probs_step.max(1)
                 targets = next_input
 
