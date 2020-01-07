@@ -103,19 +103,24 @@ class AttentionCell(nn.Module):
         # we assume that the channel of feature are known, named self.feature_map_channel
         feature_batch_size, _, feature_map_H, feature_map_W = feature_map.size()
         feature_map_h = self.conv_m2h(feature_map)
+
+        # prev_hidden  : (h, c)
+        prev_hidden_proj = self.h2h(prev_hidden_2[0])#.unsqueeze(2).unsqueeze(2) # prev_hidden_2[0] shape [batch_size x hidden_size]
+
         # [batch_size x num_encoder_step x num_channel] -> [batch_size x num_encoder_step x hidden_size]
         batch_H_proj = self.i2h(batch_H) # batch_H shape [batch_size x num_encoder_step x hidden_size]
         batch_H_proj = torch.mean(batch_H_proj, 1)
+        batch_H_proj = batch_H_proj + prev_hidden_proj
+
         batch_H = batch_H_proj.repeat(feature_map_H, feature_map_W, 1, 1).permute(2, 3, 0, 1) # batch_size x channel x H x W
 
         batch_H_proj = self.conv_h2h(batch_H)
         
 
-        # prev_hidden  : (h, c)
-        prev_hidden_proj = self.h2h(prev_hidden_2[0]).unsqueeze(2).unsqueeze(2) # prev_hidden_2[0] shape [batch_size x hidden_size]
-        # e = self.score(torch.tanh(batch_H_proj + prev_hidden_proj))  # batch_size x num_encoder_step * 1
-        e = self.score(torch.tanh(feature_map_h + batch_H_proj + prev_hidden_proj))
         
+        # e = self.score(torch.tanh(batch_H_proj + prev_hidden_proj))  # batch_size x num_encoder_step * 1
+        e = self.score(torch.tanh(feature_map_h + batch_H_proj)) # + prev_hidden_proj))
+        print(e.shape, feature_map_h.shape, batch_H_proj.shape, prev_hidden_proj.shape)
         e = e.reshape(feature_batch_size, 1, -1)
         alpha = F.softmax(e, dim=2)
         alpha = alpha.reshape(feature_batch_size, 1, feature_map_H, feature_map_W)
