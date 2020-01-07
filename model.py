@@ -52,7 +52,7 @@ class Model(nn.Module):
             raise Exception('No FeatureExtraction module specified')
         self.FeatureExtraction_output = opt.output_channel  # int(imgH/16-1) * 512
         
-        self.AdaptiveAvgPool = nn.AdaptiveAvgPool2d((None, 1))  # Transform final (imgH/16-1) -> 1
+        self.AdaptiveAvgPool = nn.AdaptiveMaxPool2d((None, 1))  # Transform final (imgH/16-1) -> 1
 
         """ Sequence modeling"""
         if opt.SequenceModeling == 'BiLSTM':
@@ -120,7 +120,7 @@ if __name__ == "__main__":
     opt.baseline = True
     net = Model(opt)
 
-    x = torch.zeros(10, 3, 32, 100)
+    x = torch.randn(10, 3, 100, 100)
     text = torch.zeros(10, 38).long()
     y = net(x, text)
     print(y.shape)
