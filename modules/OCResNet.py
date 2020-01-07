@@ -1,3 +1,4 @@
+import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.nn.init as init
@@ -111,13 +112,13 @@ class OCResNet(nn.Module):
         self.bn4 = nn.BatchNorm2d(self.output_channel_block[3])
 
         """ U network"""
-        self.upconv1 = double_conv(self.output_channel_block[3]//2, self.output_channel_block[3]//2, 256)
-        self.upconv2 = double_conv(self.output_channel_block[2], 256, 256)
-        self.upconv3 = double_conv(self.output_channel_block[1], 256, 256)
+        self.upconv1 = double_conv(self.output_channel_block[3]//2, self.output_channel_block[3]//2, 512)
+        self.upconv2 = double_conv(self.output_channel_block[2], 512, 512)
+        self.upconv3 = double_conv(self.output_channel_block[1], 512, 512)
 
         self.head = nn.Sequential(
-            nn.Conv2d(256, 256, 3, 1, 1), 
-            nn.BatchNorm2d(256),
+            nn.Conv2d(512, 512, 3, 1, 1), 
+            nn.BatchNorm2d(512),
             nn.ReLU(inplace=True)
         )
 
@@ -180,13 +181,13 @@ class OCResNet(nn.Module):
         x = F.interpolate(p5, size=c4.size()[2:], mode='bilinear', align_corners=False)
         x = torch.cat([x, c4], dim=1)
 
-        p4 = self.upconv2(x)
+        p4 = self.upconv2(x) # B * 256 * (H/8) * (W/4)
         x = F.interpolate(p4, size=c3.size()[2:], mode='bilinear', align_corners=False)
         x = torch.cat([x, c3], dim=1)
 
-        p3 = self.upconv3(x)
+        p3 = self.upconv3(x) # B * 256 * (H/4) * (W/4)
         x = F.interpolate(p3, size=c2.size()[2:], mode='bilinear', align_corners=False)
-        x = self.head(x)
+        x = self.head(x) # B * 256 * (H/2) * (W/2)
 
         return x
 
@@ -202,7 +203,7 @@ class OCResNet_FeatureExtractor(nn.Module):
 
 if __name__ == "__main__":
     import torch
-    x = torch.zeros(10, 3, 32, 100)
+    x = torch.zeros(10, 3, 100, 100)
     net = OCResNet(3, 512, BasicBlock, [1, 2, 5, 3])
     print(net)
     y = net(x)
