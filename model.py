@@ -113,7 +113,7 @@ if __name__ == "__main__":
     opt.SequenceModeling = "BiLSTM"
     opt.Prediction = "Attn"
     opt.input_channel = 3
-    opt.output_channel = 256
+    opt.output_channel = 512
     opt.hidden_size = 256
     opt.num_class = 37
     opt.batch_max_length = 25
