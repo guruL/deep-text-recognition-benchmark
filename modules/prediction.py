@@ -120,7 +120,7 @@ class AttentionCell(nn.Module):
         
         # e = self.score(torch.tanh(batch_H_proj + prev_hidden_proj))  # batch_size x num_encoder_step * 1
         e = self.score(torch.tanh(feature_map_h + batch_H_proj)) # + prev_hidden_proj))
-        print(e.shape, feature_map_h.shape, batch_H_proj.shape, prev_hidden_proj.shape)
+        # print(e.shape, feature_map_h.shape, batch_H_proj.shape, prev_hidden_proj.shape)
         e = e.reshape(feature_batch_size, 1, -1)
         alpha = F.softmax(e, dim=2)
         alpha = alpha.reshape(feature_batch_size, 1, feature_map_H, feature_map_W)
