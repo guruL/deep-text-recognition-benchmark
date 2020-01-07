@@ -90,7 +90,7 @@ class AttentionCell(nn.Module):
         self.rnn2 = nn.LSTMCell(hidden_size, hidden_size)
         self.hidden_size = hidden_size
 
-        self.feature_map_channel = 512
+        self.feature_map_channel = 256
         self.conv_h2h = nn.Conv2d(hidden_size, hidden_size, 1)
         self.conv_m2h = nn.Conv2d(self.feature_map_channel, hidden_size, 3, 1, 1)
         self.conv_s2a = nn.Conv2d(hidden_size, 1, 1)

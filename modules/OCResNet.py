@@ -112,13 +112,13 @@ class OCResNet(nn.Module):
         self.bn4 = nn.BatchNorm2d(self.output_channel_block[3])
 
         """ U network"""
-        self.upconv1 = double_conv(self.output_channel_block[3]//2, self.output_channel_block[3]//2, 512)
-        self.upconv2 = double_conv(self.output_channel_block[2], 512, 512)
-        self.upconv3 = double_conv(self.output_channel_block[1], 512, 512)
+        self.upconv1 = double_conv(self.output_channel_block[3]//2, self.output_channel_block[3]//2, 256)
+        self.upconv2 = double_conv(self.output_channel_block[2], 256, 256)
+        self.upconv3 = double_conv(self.output_channel_block[1], 256, 256)
 
         self.head = nn.Sequential(
-            nn.Conv2d(512, 512, 3, 1, 1), 
-            nn.BatchNorm2d(512),
+            nn.Conv2d(256, 256, 3, 1, 1), 
+            nn.BatchNorm2d(256),
             nn.ReLU(inplace=True)
         )
 
