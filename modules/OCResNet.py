@@ -111,7 +111,16 @@ class OCResNet(nn.Module):
                                  3], kernel_size=3, stride=1, padding=1, bias=False)
         self.bn4 = nn.BatchNorm2d(self.output_channel_block[3])
 
-        """ U network"""
+        """ deep lab """
+        self.rate1 = nn.Sequential(nn.Conv2d(512, 512, 1, 1, 0), nn.BatchNorm2d(512), nn.ReLU(inplace=True))
+        self.rate6 = nn.Sequential(nn.Conv2d(512, 512, 3, 1, 6, 6), nn.BatchNorm2d(512), nn.ReLU(inplace=True))
+        self.rate12 = nn.Sequential(nn.Conv2d(512, 512, 3, 1, 12, 12), nn.BatchNorm2d(512), nn.ReLU(inplace=True))
+        self.rate18 = nn.Sequential(nn.Conv2d(512, 512, 3, 1, 18, 18), nn.BatchNorm2d(512), nn.ReLU(inplace=True))
+        self.pool = nn.Sequential(nn.AdaptiveAvgPool2d(1), nn.Conv2d(512, 512, 1, 1, 0), nn.BatchNorm2d(512), nn.ReLU(inplace=True))
+
+        self.cat_deep = nn.Sequential(nn.Conv2d(512*5, 512, 1, 1, 0), nn.BatchNorm2d(512), nn.ReLU(inplace=True))
+
+        """ U network """
         self.upconv1 = double_conv(self.output_channel_block[3]//2, self.output_channel_block[3]//2, 512)
         self.upconv2 = double_conv(self.output_channel_block[2], 512, 512)
         self.upconv3 = double_conv(self.output_channel_block[1], 512, 512)
@@ -121,6 +130,14 @@ class OCResNet(nn.Module):
             nn.BatchNorm2d(512),
             nn.ReLU(inplace=True)
         )
+
+        init_weights(self.rate1.modules())
+        init_weights(self.rate6.modules())
+        init_weights(self.rate12.modules())
+        init_weights(self.rate18.modules())
+        init_weights(self.pool.modules())
+        init_weights(self.cat_deep.modules())
+
 
         init_weights(self.upconv1.modules())
         init_weights(self.upconv2.modules())
@@ -177,7 +194,16 @@ class OCResNet(nn.Module):
         x = self.bn4(x)
         c5 = self.relu(x) # B * 512 * (H/16) * (W/4)
 
-        p5 = self.upconv1(c5) # B * 256 * (H/16) * (W/4)
+        r1 = self.rate1(c5)
+        r2 = self.rate6(c5)
+        r3 = self.rate12(c5)
+        r4 = self.rate18(c5)
+        r5 = self.pool(c5)
+        r5 = F.interpolate(r5, size=r5.size()[2:], mode='bilinear', align_corners=False)
+        x = torch.cat([r1, r2, r3, r4, r5], 1)
+        x = self.cat_deep(x)
+
+        p5 = self.upconv1(x) # B * 256 * (H/16) * (W/4)
         x = F.interpolate(p5, size=c4.size()[2:], mode='bilinear', align_corners=False)
         x = torch.cat([x, c4], dim=1)
 
