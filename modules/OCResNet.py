@@ -199,7 +199,7 @@ class OCResNet(nn.Module):
         r3 = self.rate12(c5)
         r4 = self.rate18(c5)
         r5 = self.pool(c5)
-        r5 = F.interpolate(r5, size=r5.size()[2:], mode='bilinear', align_corners=False)
+        r5 = F.interpolate(r5, size=c5.size()[2:], mode='bilinear', align_corners=False)
         x = torch.cat([r1, r2, r3, r4, r5], 1)
         x = self.cat_deep(x)
 
